@@ -16,9 +16,11 @@ model = PredictableModel(Fisherfaces(), NearestNeighbor())
 
 vc=cv2.VideoCapture(0)
 face_cascade = cv2.CascadeClassifier('/Users/yuxiao/haarcascade_frontalface_alt.xml')
+eye_cascade = cv2.CascadeClassifier('/Users/yuxiao/haarcascade_eye.xml')
 if face_cascade.empty():
     print('can not find haarcascade_frontalface_alt.xml')
-
+if eye_cascade.empty():
+    print('can not find haarcascade_eye.xml')
 
 #una volta ottenuto (prossimo step) un db di facce, le 
 def read_images(path, sz=(256,256)):
@@ -45,7 +47,6 @@ def read_images(path, sz=(256,256)):
             for filename in os.listdir(subject_path):
                 try:
                     im = cv2.imread(os.path.join(subject_path, filename), cv2.IMREAD_GRAYSCALE)
-                    
                     # resize to given size (if given)
                     if (sz is not None):
                         im = cv2.resize(im, sz)
@@ -82,7 +83,19 @@ def ismatch(x1,y1,w1,h1,x2,y2,w2,h2,margin=5):
     else:
         return False
 
-
+def ismatch(x1,y1,w1,h1,x2,y2,w2,h2,margin=4):
+    '''
+    x1 is the fixed region  x2 is the detected region
+    we want detected region outside or equal fixed region 
+    '''
+    outer = 3*margin
+    inner = margin
+    if x2 + inner < x1 and y2 + inner < y2 and x2 + w2 > x1 + w1 + inner and y2 +w2 > y1 + w1 +inner and x2 + outer > x1 and y2 + outer > y2 and x2 + w2 < x1 + w1 + outer and y2 +w2 < y1 + w1 +outer :
+        return True
+    else :
+        return False
+        
+    
 #inizializzazione:
 quanti = int(raw_input('how many people to recognize? \n number:'))
 for i in range(quanti):
@@ -131,7 +144,8 @@ for i in range(quanti):
                 if (count + 1) % 5 == 0:
                     prehit = hittime
                     hittime += 1
-                    resized_image = cv2.resize(frame[y:y+h,x:x+w], (273, 273))
+                    #resized_image = cv2.resize(frame[y:y+h,x:x+w], (273, 273))
+                    resized_image = cv2.resize(frame[sd_y:sd_y+sd_h,sd_x:sd_x+sd_w], (273, 273))
                     print  pathdir+nome+'/'+str(time.time()-start)+'.jpg'
                     cv2.imwrite( pathdir+nome+'/'+str(time.time()-start)+'.jpg', resized_image );
                     break;
@@ -157,13 +171,28 @@ list_of_labels = list(xrange(max(y)+1))
 subject_dictionary = dict(zip(list_of_labels, subject_names))
 model.compute(X,y)
 
+recognizer = cv2.createLBPHFaceRecognizer()
+
+recognizer.train(X,np.array(y))
+
 #comincia il riconoscimento.
 while (1):
     rval, frame = vc.read()
     img = frame
+    size=img.shape[:2]
+    h, w = size
+    minSize=(int(w*0.3), int(h*0.5))
+    minEyeSize=(int(w*0.3), int(h*0.1))
+    
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, 1.2, 3)
+    
+    faces = face_cascade.detectMultiScale(gray,1.1,4,0,minSize)
+    
+    eyes = eye_cascade.detectMultiScale(gray,1.1,4,0,minEyeSize)
+    
     cv2.rectangle(frame,(sd_x,sd_y),(sd_x+sd_w,sd_y+sd_h),(0,0,255),2)
+    for (x,y,w,h) in eyes:
+        cv2.rectangle(img,(x,y),(x+w,y+h),(255,255,0),2)
     for (x,y,w,h) in faces:
         cv2.rectangle(img,(x,y),(x+w,y+h),(255,0,0),2)
         sampleImage = gray[y:y+h, x:x+w]
@@ -171,7 +200,10 @@ while (1):
 
         #capiamo di chi è sta faccia
         [ predicted_label, generic_classifier_output] = model.predict(sampleImage)
+        label, output = recognizer.predict(sampleImage)
         print [ predicted_label, generic_classifier_output]
+        print ('LBP res: '+ str(label)+' conf'+ str(output))
+        cv2.putText(img,'LBP res: '+str(subject_dictionary[label])+" "+str(output), (100,50), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,250),3,1)
         #scelta la soglia a 700. soglia maggiore di 700, accuratezza minore e v.v.
         confi = generic_classifier_output['distances']
         if int(confi) >=  5000:
