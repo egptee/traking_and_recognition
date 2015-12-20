@@ -1,6 +1,8 @@
 from facerec.feature import Fisherfaces
 from facerec.classifier import NearestNeighbor
 from facerec.model import PredictableModel
+
+
 from PIL import Image
 import numpy as np
 from PIL import Image
@@ -47,6 +49,11 @@ def read_images(path, sz=(256,256)):
             for filename in os.listdir(subject_path):
                 try:
                     im = cv2.imread(os.path.join(subject_path, filename), cv2.IMREAD_GRAYSCALE)
+                    ## cv2.equalizeHist(img)  #test equalize
+                    img =im
+                    equ = cv2.equalizeHist(img)
+                    res = np.hstack((img,equ)) #stacking images side-by-side
+                    im = res
                     # resize to given size (if given)
                     if (sz is not None):
                         im = cv2.resize(im, sz)
@@ -199,21 +206,23 @@ while (1):
         sampleImage = cv2.resize(sampleImage, (256,256))
 
         #capiamo di chi è sta faccia
-        [ predicted_label, generic_classifier_output] = model.predict(sampleImage)
-        label, output = recognizer.predict(sampleImage)
-        print [ predicted_label, generic_classifier_output]
+        #[ predicted_label, generic_classifier_output] = model.predict(sampleImage)
+        equ = cv2.equalizeHist(sampleImage)
+        res = np.hstack((sampleImage,equ)) #stacking images side-by-side
+        label, output = recognizer.predict(res)
+        #print [ predicted_label, generic_classifier_output]
         print ('LBP res: '+ str(label)+' conf'+ str(output))
         cv2.putText(img,'LBP res: '+str(subject_dictionary[label])+" "+str(output), (100,50), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,250),3,1)
         #scelta la soglia a 700. soglia maggiore di 700, accuratezza minore e v.v.
-        confi = generic_classifier_output['distances']
-        if int(confi) >=  5000:
-            cv2.putText(img,'guess: '+str(subject_dictionary[predicted_label])+" "+str(confi), (x,y), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,250),3,1)
-        elif int(confi) >=  3000:
-            cv2.putText(img,'strong: '+str(subject_dictionary[predicted_label])+" "+str(confi), (x,y), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,250),3,1)
-        elif int(confi) <=  700:
-            cv2.putText(img,'confirm: '+str(subject_dictionary[predicted_label])+" "+str(confi), (x,y), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,250),3,1)
-        else :
-            cv2.putText(img,'bit confirm: '+str(subject_dictionary[predicted_label])+" "+str(confi), (x,y), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,250),3,1)
+        # confi = generic_classifier_output['distances']
+        # if int(confi) >=  5000:
+        #     cv2.putText(img,'guess: '+str(subject_dictionary[predicted_label])+" "+str(confi), (x,y), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,250),3,1)
+        # elif int(confi) >=  3000:
+        #     cv2.putText(img,'strong: '+str(subject_dictionary[predicted_label])+" "+str(confi), (x,y), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,250),3,1)
+        # elif int(confi) <=  700:
+        #     cv2.putText(img,'confirm: '+str(subject_dictionary[predicted_label])+" "+str(confi), (x,y), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,250),3,1)
+        # else :
+        #     cv2.putText(img,'bit confirm: '+str(subject_dictionary[predicted_label])+" "+str(confi), (x,y), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,250),3,1)
     cv2.imshow('result',img)
     if cv2.waitKey(10) == 27:
         break
